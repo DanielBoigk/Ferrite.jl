@@ -1,0 +1,1 @@
+{"generated_at":"2026-09-30T16:11:43Z","latest_fingerprint":{"arch":"aarch64","cpu":"ARM Neoverse-N2","julia":"1.13.1","os":"Linux","suite":"51cc7e8b35c78bc1b536ece0c189f66ff89204e31fc7f7d9696375e320a7c7f5","threads":1},"package":"Ferrite.jl","releases":[],"repo_url":"https://github.com/DanielBoigk/Ferrite.jl","schema":"tachometer-timeseries","shards":["shard-2026"],"version":3}
