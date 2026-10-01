@@ -9,11 +9,13 @@ Ferrite.jl supports efficient h-adaptivity through a p4est type of implementatio
 This approach is designed to handle unstructured hexahedral (in 3D) and quadrilateral (in 2D) meshes.
 A further restriction of the p4est type of implementation is isotropic refinement, meaning that an element is always subdivided uniformly in all directions: a quadrilateral is split into four and a hexahedron into eight children.
 Anisotropic refinement, where an element is subdivided along only some of its axes, is not supported.
+Meshes of linear triangles are refined by newest vertex bisection instead, which keeps the mesh conforming (see [Conforming refinement of triangles](@ref topic-amr-bisection)).
 
 In AMR different phenomena and vocabulary emerge which we group into the following aspects
 
 - hanging nodes
 - balancing
+- conforming refinement of triangles
 - error estimation
 
 ## Hanging nodes
@@ -132,6 +134,32 @@ In Ferrite's p4est implementation, one must call `balanceforest!` to balance the
 ```julia
 balanceforest!(adaptive_grid)
 ```
+
+## [Conforming refinement of triangles](@id topic-amr-bisection)
+Triangles can be refined without hanging nodes by bisection: a triangle is split into two by connecting the midpoint of one of its edges, the *refinement edge*, with the opposite vertex.
+If the neighbour across that edge is not bisected along the same edge, the new midpoint is a hanging node, so the neighbour is bisected as well, possibly after first bisecting it along its own refinement edge.
+This *closure* continues until the mesh is conforming again.
+It does not spread far: for a suitable choice of the initial refinement edges, the total number of cells created over all refinement steps is bounded by a constant times the total number of marked cells [BDD2004](@cite), [Stevenson2008](@cite).
+
+Newest vertex bisection [Mitchell1991](@cite) chooses the refinement edges so that the shapes of the cells do not degenerate.
+Every triangle stores its vertices as `(i, j, k)` with refinement edge `(i, j)`; the vertex `k` is the *newest vertex*.
+Bisection inserts the midpoint `m` of `(i, j)` and creates the children `(k, i, m)` and `(j, k, m)`, whose refinement edges `(k, i)` and `(j, k)` lie opposite the new vertex `m`:
+```
+            k                                 k
+           / \                               /|\
+          /   \                             / | \
+         /     \          bisection        /  |  \
+        /       \        --------->       /   |   \
+       /         \                       /    |    \
+      i-----------j                     i-----m-----j
+```
+All cells created from one initial triangle fall into at most four similarity classes, so the angles of the refined mesh are bounded below by a fixed fraction of the angles of the initial mesh.
+The initial refinement edge of every triangle is its longest edge.
+
+In Ferrite, [`BisectionMesh`](@ref Ferrite.AMR.BisectionMesh) implements this for meshes of linear triangles.
+Since the refined meshes are conforming, they are plain `Grid`s and need no `ConformityConstraint`, and continuous spaces of any order can be used on them.
+Two bisections quarter a cell, so the maximum refinement level of a `BisectionMesh` counts bisections, not quarterings as for a `ForestBWG`.
+Coarsening is not implemented.
 
 ## Error estimation
 Error estimation is a critical component of adaptive mesh refinement (AMR) in finite element analysis.

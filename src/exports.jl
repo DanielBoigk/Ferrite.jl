@@ -111,6 +111,7 @@ export
     generate_grid,
     # Adaptive mesh refinement (AMR)
     ForestBWG,
+    BisectionMesh,
     refine!,
     refine_all!,
     refine_and_coarsen!,

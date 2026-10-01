@@ -632,3 +632,33 @@ The hanging-node map produced by `creategrid` is turned into affine constraints 
 `ConformityConstraint` to a `ConstraintHandler`; the constraint weights and their
 justification are user-facing and documented in the [AMR topic guide](@ref topic-amr) and
 [`ConformityConstraint`](@ref).
+
+## Newest vertex bisection
+
+[`BisectionMesh`](@ref Ferrite.AMR.BisectionMesh) stores only the leaves of the bisection
+forest, like the octrees of `ForestBWG`, as vertex triples `(i, j, k)` in counter-clockwise
+order with refinement edge `(i, j)` (see the [topic guide](@ref topic-amr-bisection) for the
+bisection rule). The tree structure is not needed for refinement: the refinement edges are
+encoded in the vertex order. Nodes are never removed, and the nodes of the initial grid keep
+their numbers.
+
+Besides the leaves, the mesh keeps three maps keyed by sorted node pairs:
+
+- `midpoints`: split edge → midpoint node. An edge in this map must not remain in any leaf;
+  a leaf that still contains one is *dirty*.
+- `edgecells`: edge → the (at most two) leaves containing it. When an edge is split, the
+  other leaf containing it is the one that becomes dirty, so the closure never searches the
+  mesh: the cost of `refine!` is proportional to the number of bisections.
+- `facetsets`: the facet sets of the initial grid as edges. A split edge is replaced by its
+  halves, and `creategrid` translates the edges back to `FacetIndex`es.
+
+`refine!` first bisects each marked leaf once (below the maximum level), then processes a
+stack of dirty leaves: a leaf that still contains a split edge is bisected along its
+refinement edge. If the split edge was not the refinement edge, the child inheriting it has
+it as refinement edge (this is the defining property of newest vertex bisection) and is
+pushed to the stack again, so a dirty leaf is resolved within at most three bisections. The
+closure ignores the maximum level, as conformity has priority.
+
+```@docs
+Ferrite.AMR._bisect!
+```

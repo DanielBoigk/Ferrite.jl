@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+ - New `BisectionMesh` for conforming adaptive refinement of linear triangle meshes by
+   newest vertex bisection. `refine!(mesh, cellids)` bisects the marked cells and restores
+   conformity, and `creategrid(mesh)` returns a plain `Grid` without hanging nodes, with the
+   cell and facet sets of the initial grid carried over.
  - New function `interfaceskeleton(topology, grid)` returning the *interfaces* of the
    grid (the interior facets, i.e. the subset of `facetskeleton` shared between two
    cells) as a `Vector` of facet pairs `(facet_here, facet_there)`. Like the facet

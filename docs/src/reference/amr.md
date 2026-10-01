@@ -36,6 +36,16 @@ balanceforest!
 creategrid
 ```
 
+## Newest vertex bisection
+
+Conforming local refinement of triangle meshes, without hanging nodes. Refinement and
+materialization use the [`refine!`](@ref Ferrite.AMR.refine!) and
+[`creategrid`](@ref Ferrite.AMR.creategrid) methods documented above.
+
+```@docs
+BisectionMesh
+```
+
 ## Constraints
 
 ```@docs

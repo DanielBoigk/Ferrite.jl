@@ -10,8 +10,10 @@ include("octree.jl")
 include("forest.jl")
 include("ncgrid.jl")
 include("constraints.jl")
+include("bisection.jl")
 
 export ForestBWG,
+    BisectionMesh,
     refine!,
     refine_all!,
     coarsen!,

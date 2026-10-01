@@ -163,6 +163,7 @@ include("Adaptivity/AMR.jl")
 # `NonConformingGrid` is used inside Ferrite itself (`DofHandler`, `L2Projector`); the rest are
 # re-exported from `exports.jl` as the public AMR API.
 using .AMR: ForestBWG,
+    BisectionMesh,
     refine!,
     refine_all!,
     coarsen!,
