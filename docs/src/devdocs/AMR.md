@@ -662,3 +662,16 @@ closure ignores the maximum level, as conformity has priority.
 ```@docs
 Ferrite.AMR._bisect!
 ```
+
+`coarsen!` works in two passes, so that `refine_and_coarsen!` can reject conflicting marks
+before the mesh changes. The *plan* inverts `midpoints` (bisection-created vertex → the edge
+it split), collects the newest vertices of the marked leaves and builds their stars in one
+scan over the leaves. A vertex `v` qualifies if its star has two or four leaves, `v` is the
+newest vertex of all of them, and they pair up as children `T₁ = (k, i, v)`,
+`T₂ = (j, k, v)` (`T₁[1] == T₂[2]`) of parents `(T₁[2], T₂[1], T₁[1])` whose refinement edge
+is the edge `v` split. The last condition rejects pairings across the split edge in a star of
+four. Stars of different vertices are disjoint, as every leaf has one newest vertex. The
+*apply* pass overwrites `T₁` with the parent, drops `T₂`, restores the split edge in
+`midpoints` and the facet sets, and renumbers: leaves keep their order, removed vertices are
+deleted from the node list (they are never nodes of the initial grid, which therefore keep
+their numbers), and `edgecells` is rebuilt. Both passes are linear in the number of leaves.

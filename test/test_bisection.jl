@@ -145,9 +145,122 @@ end
         @test x1' * K * x1 ≈ 4.0
     end
 
+    # the mesh as a set of triangles in node coordinates, with refinement edges and levels
+    function shape(mesh)
+        x(n) = Tuple(mesh.nodes[n])
+        return Set((x(t[1]), x(t[2]), x(t[3]), l) for (t, l) in zip(mesh.tris, mesh.levels))
+    end
+
+    @testset "coarsening inverts refinement" begin
+        mesh = BisectionMesh(base)
+        before = shape(mesh)
+        n0 = getncells(mesh)
+        refine!(mesh, 5)
+        refine!(mesh, 1:getncells(mesh))
+        # every sweep removes the newest vertices; repeat until nothing changes (the closure
+        # can bisect a cell twice in one refinement, so this may take more than two sweeps)
+        sweeps = 0
+        while true
+            n = getncells(mesh)
+            coarsen!(mesh, 1:n)
+            getncells(mesh) == n && break
+            sweeps += 1
+        end
+        @test 2 <= sweeps <= 4
+        @test getncells(mesh) == n0
+        @test shape(mesh) == before
+        @test length(mesh.nodes) == getnnodes(base)
+        @test isempty(mesh.midpoints)
+        grid = creategrid(mesh)
+        @test all(n -> get_node_coordinate(grid, n) == get_node_coordinate(base, n), 1:getnnodes(base))
+        for name in ("left", "right", "top", "bottom")
+            @test getfacetset(grid, name) == getfacetset(creategrid(BisectionMesh(base)), name)
+        end
+        # nothing left to coarsen
+        coarsen!(mesh, 1:getncells(mesh))
+        @test getncells(mesh) == n0
+    end
+
+    @testset "coarsening keeps the mesh conforming and consistent" begin
+        mesh = BisectionMesh(base)
+        for _ in 1:6
+            refine!(mesh, rand(rng, 1:getncells(mesh), 8))
+        end
+        for step in 1:30
+            if isodd(step)
+                coarsen!(mesh, unique(rand(rng, 1:getncells(mesh), getncells(mesh) ÷ 2)))
+            else
+                refine!(mesh, rand(rng, 1:getncells(mesh), 3))
+            end
+            grid = creategrid(mesh)
+            @test is_conforming(grid)
+            @test all(c -> signed_area(grid, c) > 0, 1:getncells(grid))
+            @test sum(c -> signed_area(grid, c), 1:getncells(grid)) ≈ 4.0
+            @test sum(name -> facetset_length(grid, getfacetset(grid, name)), ("left", "right", "top", "bottom")) ≈ 8.0
+            # every node is used, and every split edge's midpoint still exists
+            @test Set(n for c in getcells(grid) for n in c.nodes) == Set(1:getnnodes(grid))
+            @test all(((e, m),) -> m <= getnnodes(grid), mesh.midpoints)
+            # the edge-to-leaf map matches the leaves
+            edges = Dict{Tuple{Int, Int}, Vector{Int}}()
+            for (c, t) in enumerate(mesh.tris), e in ((t[1], t[2]), (t[2], t[3]), (t[3], t[1]))
+                push!(get!(edges, minmax(e...), Int[]), c)
+            end
+            @test Dict(e => sort(c) for (e, c) in mesh.edgecells) == edges
+        end
+        # coarsening everything repeatedly returns to the initial mesh
+        for _ in 1:40
+            coarsen!(mesh, 1:getncells(mesh))
+        end
+        @test shape(mesh) == shape(BisectionMesh(base))
+    end
+
+    @testset "coarsening needs the whole star, unless require_all_siblings = false" begin
+        mesh = BisectionMesh(base)
+        refine!(mesh, 5)                           # interior refinement edge: star of 4 cells
+        m = length(mesh.nodes)
+        star = [c for (c, t) in enumerate(mesh.tris) if m in t]
+        @test length(star) == 4
+        n = getncells(mesh)
+        coarsen!(mesh, star[1:3])
+        @test getncells(mesh) == n
+        coarsen!(mesh, star[1:1]; require_all_siblings = false)
+        @test getncells(mesh) == n - 2
+        @test length(mesh.nodes) == m - 1
+        # cell sets survive a refine–coarsen cycle
+        cellset_grid = generate_grid(Triangle, (2, 2))
+        addcellset!(cellset_grid, "left half", x -> x[1] <= 0)
+        mesh = BisectionMesh(cellset_grid)
+        refine!(mesh, 1:getncells(mesh))
+        coarsen!(mesh, 1:getncells(mesh))
+        @test getcellset(creategrid(mesh), "left half") == getcellset(cellset_grid, "left half")
+    end
+
+    @testset "refine_and_coarsen!" begin
+        mesh = BisectionMesh(base)
+        refine!(mesh, 1:getncells(mesh))
+        grid = creategrid(mesh)
+        # coarsen the cells on the left, refine one on the right, against one numbering
+        left = [c for c in 1:getncells(grid) if sum(n -> get_node_coordinate(grid, n)[1], getcells(grid, c).nodes) < 0]
+        right = [c for c in 1:getncells(grid) if sum(n -> get_node_coordinate(grid, n)[1], getcells(grid, c).nodes) > 0]
+        x_right = sum(n -> get_node_coordinate(grid, n), getcells(grid, right[1]).nodes) / 3
+        refine_and_coarsen!(mesh, left, right[1:1])
+        grid = creategrid(mesh)
+        @test is_conforming(grid)
+        @test sum(c -> signed_area(grid, c), 1:getncells(grid)) ≈ 4.0
+        # the refined cell: its centroid now lies in a cell of a quarter of its area or less
+        @test any(1:getncells(grid)) do c
+            a, b, d = (get_node_coordinate(grid, n) for n in getcells(grid, c).nodes)
+            inside = all(>=(-1.0e-12), (Ferrite.AMR._signed_area(a, b, x_right), Ferrite.AMR._signed_area(b, d, x_right), Ferrite.AMR._signed_area(d, a, x_right)))
+            inside && signed_area(grid, c) <= 4 / 64 / 2 + 1.0e-12
+        end
+        @test count(c -> mesh.levels[c] == 0, 1:getncells(mesh)) > 0      # left half coarsened
+        @test_throws ArgumentError refine_and_coarsen!(mesh, [1], [1])
+    end
+
     @testset "input checks" begin
         @test_throws ArgumentError BisectionMesh(generate_grid(Quadrilateral, (2, 2)))
         @test_throws DomainError BisectionMesh(base, -1)
         @test_throws BoundsError refine!(BisectionMesh(base), [33])
+        @test_throws BoundsError coarsen!(BisectionMesh(base), [33])
     end
 end

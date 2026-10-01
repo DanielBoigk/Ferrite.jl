@@ -159,7 +159,12 @@ The initial refinement edge of every triangle is its longest edge.
 In Ferrite, [`BisectionMesh`](@ref Ferrite.AMR.BisectionMesh) implements this for meshes of linear triangles.
 Since the refined meshes are conforming, they are plain `Grid`s and need no `ConformityConstraint`, and continuous spaces of any order can be used on them.
 Two bisections quarter a cell, so the maximum refinement level of a `BisectionMesh` counts bisections, not quarterings as for a `ForestBWG`.
-Coarsening is not implemented.
+
+Coarsening undoes bisections without storing a refinement tree [ChenZhang2010](@cite).
+A vertex created by bisection can be removed if it is the newest vertex of every cell around it, two cells on the boundary or four in the interior: these cells are then exactly the children of the bisection that created the vertex, and merging them pairwise restores the parents, which are recovered from the vertex order of the children.
+Coarsening is thus the exact inverse of refinement, keeps the mesh conforming and creates no new cell shapes.
+It only removes vertices whose whole neighbourhood is marked, so it never forces coarsening of unmarked cells, and one call undoes at most one bisection around each vertex.
+Since cells are renumbered, refinement and coarsening marked on the same grid are applied together with [`refine_and_coarsen!`](@ref Ferrite.AMR.refine_and_coarsen!).
 
 ## Error estimation
 Error estimation is a critical component of adaptive mesh refinement (AMR) in finite element analysis.
