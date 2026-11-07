@@ -75,6 +75,7 @@ export
     QuadraticHexahedron,
     SerendipityQuadraticHexahedron,
     Wedge,
+    QuadraticWedge,
     Pyramid,
     CellIndex,
     FaceIndex,
@@ -121,6 +122,7 @@ export
 
     # Grid coloring
     create_coloring,
+    AssemblyConflicts,
     ColoringAlgorithm,
 
     # Dofs
@@ -187,6 +189,8 @@ export
     UpdateFlags,
     cellid,
     interfacedofs,
+    interface_dof_range,
+    ndofs_per_interface,
 
     # assembly
     start_assemble,
@@ -210,4 +214,12 @@ export
     evaluate_at_points,
     PointIterator,
     PointLocation,
-    PointValues
+    PointValues,
+
+    # Misc
+    task_local_copy
+
+# Public API that is not exported (the `public` keyword requires Julia 1.11)
+@static if VERSION >= v"1.11.0-DEV.469"
+    eval(Meta.parse("public L2SolverCholesky, L2SolverCG"))
+end
